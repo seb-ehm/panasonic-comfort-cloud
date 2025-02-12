@@ -97,50 +97,9 @@ func (a *Authentication) GetNewToken() error {
 			return fmt.Errorf("login: expected status 200, got %d", resp.StatusCode)
 		}
 
-		// Step 4: Extract login callback parameters
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		bodyStr := string(bodyBytes)
-		hiddenInputs, err := ExtractHiddenInputValues(bodyStr)
+		err = performLoginCallback(resp, client)
 		if err != nil {
-			return fmt.Errorf("failed to extract hidden input values: %v", err)
-		}
-
-		formData := url.Values{}
-		for key, value := range hiddenInputs {
-			formData.Set(key, value)
-		}
-
-		// Step 4.5: Perform the login callback request
-		userAgent := "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 " +
-			"(KHTML, like Gecko) Chrome/113.0.0.0 Mobile Safari/537.36"
-
-		req, err = http.NewRequest("POST", BasePathAuth+"/login/callback", strings.NewReader(formData.Encode()))
-		if err != nil {
-			return fmt.Errorf("error creating POST request: %w", err)
-		}
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req.Header.Set("User-Agent", userAgent)
-
-		resp, err = client.Do(req)
-		if err != nil {
-			return fmt.Errorf("error making POST request: %w", err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusFound { // 302 Found
-			return fmt.Errorf("Unexpected status code: %d\n", resp.StatusCode)
-		}
-		// Follow redirect
-		location := resp.Header.Get("Location")
-
-		req, _ = http.NewRequest("GET", BasePathAuth+location, nil)
-		req.Header.Set("User-Agent", "okhttp/4.10.0")
-		resp, err = client.Do(req)
-		if err != nil {
-			return fmt.Errorf("error making POST request: %w", err)
-		}
-		if resp.StatusCode != http.StatusFound {
-			return fmt.Errorf("Unexpected status code: %d\n", resp.StatusCode)
+			return err
 		}
 	}
 	// Step 5: Get Token
@@ -240,6 +199,55 @@ func (a *Authentication) GetNewToken() error {
 	token.AccClientID = accClientID
 	a.token = &token
 
+	return nil
+}
+
+func performLoginCallback(resp *http.Response, client *http.Client) error {
+	// Step 4: Extract login callback parameters
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	bodyStr := string(bodyBytes)
+	hiddenInputs, err := ExtractHiddenInputValues(bodyStr)
+	if err != nil {
+		return fmt.Errorf("failed to extract hidden input values: %v", err)
+	}
+
+	formData := url.Values{}
+	for key, value := range hiddenInputs {
+		formData.Set(key, value)
+	}
+
+	// Step 4.5: Perform the login callback request
+	userAgent := "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 " +
+		"(KHTML, like Gecko) Chrome/113.0.0.0 Mobile Safari/537.36"
+
+	req, err := http.NewRequest("POST", BasePathAuth+"/login/callback", strings.NewReader(formData.Encode()))
+	if err != nil {
+		return fmt.Errorf("error creating POST request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", userAgent)
+
+	resp, err = client.Do(req)
+	if err != nil {
+		return fmt.Errorf("error making POST request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusFound { // 302 Found
+		return fmt.Errorf("Unexpected status code: %d\n", resp.StatusCode)
+	}
+	// Follow redirect
+	location := resp.Header.Get("Location")
+
+	req, _ = http.NewRequest("GET", BasePathAuth+location, nil)
+	req.Header.Set("User-Agent", "okhttp/4.10.0")
+	resp, err = client.Do(req)
+	if err != nil {
+		return fmt.Errorf("error making POST request: %w", err)
+	}
+	if resp.StatusCode != http.StatusFound {
+		return fmt.Errorf("Unexpected status code: %d\n", resp.StatusCode)
+	}
 	return nil
 }
 
