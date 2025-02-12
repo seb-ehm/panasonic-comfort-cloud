@@ -30,6 +30,10 @@ func (t *Token) isValid() bool {
 	if t.AccessToken == "" {
 		return false
 	}
+
+	if t.AccessTokenIssuedAt == 0 || t.AccessTokenExpiresAt == 0 {
+		return false
+	}
 	parts := strings.Split(t.AccessToken, ".")
 	if len(parts) != 3 {
 		return false
@@ -38,15 +42,15 @@ func (t *Token) isValid() bool {
 }
 
 func (t *Token) isAccessTokenExpired() (bool, error) {
-	if t == nil || t.AccessToken == "" {
-		return false, errors.New("token is empty")
+	if !t.isValid() {
+		return false, errors.New("invalid token")
 	}
+
 	if t.AccessTokenExpiresAt == 0 || t.AccessTokenIssuedAt == 0 {
-		iat, exp, err := extractIATAndEXTFromJWT(t.AccessToken)
+		err := t.setIATAndEXP()
 		if err != nil {
-			return false, fmt.Errorf("failed to extract IAT and EXP from access token: %w", err)
+			return false, fmt.Errorf("failed to set IAT and EXP: %s", err)
 		}
-		t.AccessTokenIssuedAt, t.AccessTokenExpiresAt = iat, exp
 	}
 	now := time.Now().Unix()
 
@@ -55,6 +59,15 @@ func (t *Token) isAccessTokenExpired() (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (t *Token) setIATAndEXP() error {
+	iat, exp, err := extractIATAndEXPFromJWT(t.AccessToken)
+	if err != nil {
+		return fmt.Errorf("failed to extract IAT and EXP from access token: %w", err)
+	}
+	t.AccessTokenIssuedAt, t.AccessTokenExpiresAt = iat, exp
+	return nil
 }
 
 func (t *Token) getAPIKey(timestamp time.Time) string {
@@ -82,7 +95,7 @@ func (t *Token) getAPIKey(timestamp time.Time) string {
 	return result
 }
 
-func extractIATAndEXTFromJWT(token string) (int64, int64, error) {
+func extractIATAndEXPFromJWT(token string) (int64, int64, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) < 2 {
 		return 0, 0, fmt.Errorf("invalid JWT token")
@@ -99,14 +112,14 @@ func extractIATAndEXTFromJWT(token string) (int64, int64, error) {
 		return 0, 0, fmt.Errorf("error parsing JWT JSON: %w", err)
 	}
 
-	iat, ok := payload["iat"].(int64)
+	iat, ok := payload["iat"].(float64)
 	if !ok {
 		return 0, 0, fmt.Errorf("iat not found or invalid")
 	}
-	exp, ok := payload["exp"].(int64)
+	exp, ok := payload["exp"].(float64)
 	if !ok {
 		return 0, 0, fmt.Errorf("exp not found or invalid")
 	}
 
-	return iat, exp, nil
+	return int64(iat), int64(exp), nil
 }
