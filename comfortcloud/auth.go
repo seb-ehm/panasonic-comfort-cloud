@@ -9,9 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
-	"io"
 	"io/ioutil"
-	"log"
 	"math/big"
 	"net/http"
 	"net/http/cookiejar"
@@ -51,22 +49,7 @@ func (a *Authentication) GetNewToken() error {
 
 	// Step 1: Authorize
 
-	params := url.Values{
-		"scope":                 {OAuthScopes},
-		"audience":              {OAuthAudience},
-		"protocol":              {"oauth2"},
-		"response_type":         {"code"},
-		"code_challenge":        {codeChallenge},
-		"code_challenge_method": {"S256"},
-		"auth0Client":           {Auth0Client},
-		"client_id":             {AppClientId},
-		"redirect_uri":          {RedirectUri},
-		"state":                 {state},
-	}
-
-	req, _ := http.NewRequest("GET", BasePathAuth+"/authorize?"+params.Encode(), nil)
-	req.Header.Set("User-Agent", "okhttp/4.10.0")
-	resp, err := client.Do(req)
+	resp, err := makeAuthorizeRequest(codeChallenge, state, client)
 	if err != nil {
 		return err
 	}
@@ -76,17 +59,9 @@ func (a *Authentication) GetNewToken() error {
 		return fmt.Errorf("authorize: expected status 302, got %d", resp.StatusCode)
 	}
 
-	// Step 2: Follow Redirect
-	location := resp.Header.Get("Location")
-	//get new state
-	parsedURL, err := url.Parse(location)
+	location, state, err := handleRedirect(resp, state)
 	if err != nil {
-		return fmt.Errorf("failed to parse redirect URL: %w", err)
-	}
-	queryParams := parsedURL.Query()
-	newState := queryParams.Get("state")
-	if newState != "" {
-		state = newState
+		return err
 	}
 
 	if !strings.HasPrefix(location, RedirectUri) {
@@ -195,11 +170,11 @@ func (a *Authentication) GetNewToken() error {
 	// Step 5: Get Token
 	location = resp.Header.Get("Location")
 	//get code
-	parsedURL, err = url.Parse(location)
+	parsedURL, err := url.Parse(location)
 	if err != nil {
 		return fmt.Errorf("failed to parse redirect URL: %w", err)
 	}
-	queryParams = parsedURL.Query()
+	queryParams := parsedURL.Query()
 	code := queryParams.Get("code")
 	//unixTimeTokenReceived := time.Now().Unix()
 
@@ -213,7 +188,7 @@ func (a *Authentication) GetNewToken() error {
 	}
 
 	jsonData, _ := json.Marshal(tokenRequest)
-	req, _ = http.NewRequest("POST", BasePathAuth+"/oauth/token", strings.NewReader(string(jsonData)))
+	req, _ := http.NewRequest("POST", BasePathAuth+"/oauth/token", strings.NewReader(string(jsonData)))
 	req.Header.Set("Auth0-Client", Auth0Client)
 	req.Header.Set("User-Agent", "okhttp/4.10.0")
 	req.Header.Set("Content-Type", "application/json")
@@ -230,18 +205,9 @@ func (a *Authentication) GetNewToken() error {
 
 	// Parse token response
 	var tokenResponse Token
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("Failed to read response body: %v", err)
-	}
-	fmt.Println("Body:", string(bodyBytes))
-
-	// Restore the body so it can be read again
-	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
 	err = json.NewDecoder(resp.Body).Decode(&tokenResponse)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to decode token response: %w", err)
 	}
 	fmt.Println("Token Response:", tokenResponse)
 	tokenResponse.setIATAndEXP()
@@ -299,6 +265,46 @@ func (a *Authentication) GetNewToken() error {
 	a.token = &token
 
 	return nil
+}
+
+func handleRedirect(resp *http.Response, state string) (string, string, error) {
+	location := resp.Header.Get("Location")
+	parsedURL, err := url.Parse(location)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse redirect URL: %w", err)
+	}
+	queryParams := parsedURL.Query()
+	newState := queryParams.Get("state")
+	if newState != "" {
+		state = newState
+	}
+	return location, state, nil
+}
+
+func makeAuthorizeRequest(codeChallenge string, state string, client *http.Client) (*http.Response, error) {
+	params := url.Values{
+		"scope":                 {OAuthScopes},
+		"audience":              {OAuthAudience},
+		"protocol":              {"oauth2"},
+		"response_type":         {"code"},
+		"code_challenge":        {codeChallenge},
+		"code_challenge_method": {"S256"},
+		"auth0Client":           {Auth0Client},
+		"client_id":             {AppClientId},
+		"redirect_uri":          {RedirectUri},
+		"state":                 {state},
+	}
+
+	req, err := http.NewRequest("GET", BasePathAuth+"/authorize?"+params.Encode(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("error building authorize request %w", err)
+	}
+	req.Header.Set("User-Agent", "okhttp/4.10.0")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making authorization request %w", err)
+	}
+	return resp, nil
 }
 
 func generateOAuthParameters() (string, string, string) {
