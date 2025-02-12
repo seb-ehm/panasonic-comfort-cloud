@@ -12,15 +12,14 @@ import (
 )
 
 type Token struct {
-	AccessToken                string `json:"access_token"`
-	AccessTokenIssuedAt        int64  `json:"access_token_issued_at"`
-	AccessTokenExpiresAt       int64  `json:"access_token_expires_at"`
-	RefreshToken               string `json:"refresh_token"`
-	IDToken                    string `json:"id_token"`
-	UnixTimestampTokenReceived int64  `json:"unix_timestamp_token_received"`
-	ExpiresInSec               int    `json:"expires_in"`
-	AccClientID                string `json:"acc_client_id"`
-	Scope                      string `json:"scope"`
+	AccessToken          string `json:"access_token"`
+	AccessTokenIssuedAt  int64  `json:"access_token_issued_at"`
+	AccessTokenExpiresAt int64  `json:"access_token_expires_at"`
+	RefreshToken         string `json:"refresh_token"`
+	IDToken              string `json:"id_token"`
+	ExpiresInSec         int    `json:"expires_in"`
+	AccClientID          string `json:"acc_client_id"`
+	Scope                string `json:"scope"`
 }
 
 func (t *Token) isValid() bool {

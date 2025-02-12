@@ -102,54 +102,12 @@ func (a *Authentication) GetNewToken() error {
 			return err
 		}
 	}
+
 	// Step 5: Get Token
 	location = resp.Header.Get("Location")
-	//get code
-	parsedURL, err := url.Parse(location)
+	tokenResponse, err := getToken(location, codeVerifier, client)
 	if err != nil {
-		return fmt.Errorf("failed to parse redirect URL: %w", err)
-	}
-	queryParams := parsedURL.Query()
-	code := queryParams.Get("code")
-	//unixTimeTokenReceived := time.Now().Unix()
-
-	tokenRequest := map[string]string{
-		"scope":         "openid",
-		"client_id":     AppClientId,
-		"grant_type":    "authorization_code",
-		"code":          code,
-		"redirect_uri":  RedirectUri,
-		"code_verifier": codeVerifier,
-	}
-
-	jsonData, _ := json.Marshal(tokenRequest)
-	req, _ := http.NewRequest("POST", BasePathAuth+"/oauth/token", strings.NewReader(string(jsonData)))
-	req.Header.Set("Auth0-Client", Auth0Client)
-	req.Header.Set("User-Agent", "okhttp/4.10.0")
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err = client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("get_token: expected status 200, got %d", resp.StatusCode)
-	}
-
-	// Parse token response
-	var tokenResponse Token
-	err = json.NewDecoder(resp.Body).Decode(&tokenResponse)
-	if err != nil {
-		return fmt.Errorf("failed to decode token response: %w", err)
-	}
-	fmt.Println("Token Response:", tokenResponse)
-	tokenResponse.setIATAndEXP()
-
-	// Step 6: Get ACC Client ID
-	if !tokenResponse.isValid() {
-		return errors.New("invalid token response")
+		return fmt.Errorf("failed to get token: %w", err)
 	}
 
 	accessToken := tokenResponse.AccessToken
@@ -161,7 +119,7 @@ func (a *Authentication) GetNewToken() error {
 	postUrl := BasePathAcc + "/auth/v2/login"
 	timestamp := now.Format("2006-01-02 15:04:05")
 	reqBody := `{"language": 0}`
-	req, _ = http.NewRequest("POST", postUrl, strings.NewReader(reqBody))
+	req, _ := http.NewRequest("POST", postUrl, strings.NewReader(reqBody))
 	//req, _ = http.NewRequest("POST", "http://localhost:8080", strings.NewReader(reqBody))
 	req.Header.Set("User-Agent", "G-RAC")
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
@@ -193,11 +151,105 @@ func (a *Authentication) GetNewToken() error {
 	}
 	accClientID := accClientResponse["clientId"].(string)
 
-	fmt.Println("Access Token:", tokenResponse.AccessToken)
-	fmt.Println("ACC Client ID:", accClientID)
 	token := tokenResponse
 	token.AccClientID = accClientID
 	a.token = &token
+
+	return nil
+}
+
+func getToken(location string, codeVerifier string, client *http.Client) (Token, error) {
+	parsedURL, err := url.Parse(location)
+	if err != nil {
+		return Token{}, fmt.Errorf("failed to parse redirect URL: %w", err)
+	}
+	queryParams := parsedURL.Query()
+	code := queryParams.Get("code")
+
+	tokenRequest := map[string]string{
+		"scope":         "openid",
+		"client_id":     AppClientId,
+		"grant_type":    "authorization_code",
+		"code":          code,
+		"redirect_uri":  RedirectUri,
+		"code_verifier": codeVerifier,
+	}
+
+	jsonData, _ := json.Marshal(tokenRequest)
+	req, _ := http.NewRequest("POST", BasePathAuth+"/oauth/token", strings.NewReader(string(jsonData)))
+	req.Header.Set("Auth0-Client", Auth0Client)
+	req.Header.Set("User-Agent", "okhttp/4.10.0")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return Token{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return Token{}, fmt.Errorf("get_token: expected status 200, got %d", resp.StatusCode)
+	}
+
+	// Parse token response
+	var tokenResponse Token
+	err = json.NewDecoder(resp.Body).Decode(&tokenResponse)
+	if err != nil {
+		return Token{}, fmt.Errorf("failed to decode token response: %w", err)
+	}
+	fmt.Println("Token Response:", tokenResponse)
+	tokenResponse.setIATAndEXP()
+
+	// Step 6: Get ACC Client ID
+	if !tokenResponse.isValid() {
+		return Token{}, errors.New("invalid token response")
+	}
+	return tokenResponse, nil
+}
+
+func (a *Authentication) refreshToken() error {
+
+	// Prepare the request payload
+	payload := map[string]interface{}{
+		"scope":         a.token.Scope,
+		"client_id":     AppClientId,
+		"refresh_token": a.token.RefreshToken,
+		"grant_type":    "refresh_token",
+	}
+
+	// Prepare the request URL
+	token_url := fmt.Sprintf("%s/oauth/token", BasePathAuth)
+
+	// Send the POST request using ExecutePost
+	response, err := a.ExecutePost(token_url, payload, "refresh_token", http.StatusOK)
+	if err != nil {
+		// If the refresh token request fails, get a new token
+		if err := a.GetNewToken(); err != nil {
+			return fmt.Errorf("failed to get new token: %v", err)
+		}
+		return nil
+	}
+
+	// Parse the response
+	var tokenResponse map[string]interface{}
+	if err := json.Unmarshal(response, &tokenResponse); err != nil {
+		return fmt.Errorf("failed to parse token response: %v", err)
+	}
+	iat, exp, err := extractIATAndEXPFromJWT(a.token.AccessToken)
+	if err != nil {
+		return fmt.Errorf("failed to extract IAT: %w", err)
+	}
+	// Update the token
+	a.token = &Token{
+		AccessToken:          tokenResponse["access_token"].(string),
+		RefreshToken:         tokenResponse["refresh_token"].(string),
+		IDToken:              tokenResponse["id_token"].(string),
+		AccessTokenIssuedAt:  iat,
+		AccessTokenExpiresAt: exp,
+		ExpiresInSec:         int(tokenResponse["expires_in"].(float64)),
+		AccClientID:          a.token.AccClientID,
+		Scope:                tokenResponse["scope"].(string),
+	}
 
 	return nil
 }
@@ -361,4 +413,130 @@ func ExtractHiddenInputValues(htmlBody string) (map[string]string, error) {
 	})
 
 	return parameters, nil
+}
+
+func (a *Authentication) ExecuteGet(url, functionDescription string, expectedStatusCode int) ([]byte, error) {
+	// Ensure the token is valid
+	expired, err := a.token.isAccessTokenExpired()
+	if expired || err != nil {
+		err := a.GetNewToken()
+		if err != nil {
+			return nil, fmt.Errorf("invalid or expired token. error getting new token: %w", err)
+		}
+	}
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GET request: %v", err)
+	}
+
+	// Add headers for the API call
+	headers := a.getHeaderForAPICalls()
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+
+	// Send the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Check the response status code
+	if resp.StatusCode != expectedStatusCode {
+		return nil, fmt.Errorf(
+			"%s: expected status code %d, got %d: %s",
+			functionDescription,
+			expectedStatusCode,
+			resp.StatusCode,
+			resp.Status,
+		)
+	}
+
+	// Read and return the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	return body, nil
+}
+
+func (a *Authentication) ExecutePost(url string, jsonData map[string]interface{}, functionDescription string, expectedStatusCode int) ([]byte, error) {
+	// Ensure the token is valid
+	expired, err := a.token.isAccessTokenExpired()
+	if expired || err != nil {
+		err := a.GetNewToken()
+		if err != nil {
+			return nil, fmt.Errorf("invalid or expired token. error getting new token: %w", err)
+		}
+	}
+
+	// Convert JSON data to bytes
+	jsonBytes, err := json.Marshal(jsonData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal JSON data: %v", err)
+	}
+
+	// Create the HTTP POST request
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create POST request: %v", err)
+	}
+
+	// Add headers for the API call
+	headers := a.getHeaderForAPICalls()
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+
+	// Send the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Check the response status code
+	if resp.StatusCode != expectedStatusCode {
+		return nil, fmt.Errorf(
+			"%s: expected status code %d, got %d: %s",
+			functionDescription,
+			expectedStatusCode,
+			resp.StatusCode,
+			resp.Status,
+		)
+	}
+
+	// Read and return the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	return body, nil
+}
+
+func (a *Authentication) getHeaderForAPICalls() map[string]string {
+	now := time.Now()
+
+	headers := map[string]string{
+		"Content-Type":            "application/json;charset=utf-8",
+		"x-app-name":              "Comfort Cloud",
+		"user-agent":              "G-RAC",
+		"x-app-timestamp":         now.Format("2006-01-02 15:04:05"),
+		"x-app-type":              "1",
+		"x-app-version":           a.appVersion,
+		"x-cfc-api-key":           a.token.getAPIKey(now),
+		"x-client-id":             a.token.AccClientID,
+		"x-user-authorization-v2": "Bearer " + a.token.AccessToken,
+		"Accept-Encoding":         "gzip, deflate",
+		"Accept":                  "*/*",
+		"Connection":              "keep-alive",
+	}
+
+	return headers
 }
