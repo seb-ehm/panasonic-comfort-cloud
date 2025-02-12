@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"net/http"
 	"net/http/cookiejar"
@@ -87,31 +87,7 @@ func (a *Authentication) GetNewToken() error {
 		}
 
 		// Step 3: Login
-		loginData := map[string]string{
-			"client_id":     AppClientId,
-			"redirect_uri":  RedirectUri,
-			"tenant":        "pdpauthglb-a1",
-			"response_type": "code",
-			"scope":         OAuthScopes,
-			"audience":      OAuthAudience,
-			"_csrf":         csrf,
-			"state":         state,
-			"_intstate":     "deprecated",
-			"username":      a.username,
-			"password":      a.password,
-			"lang":          "en",
-			"connection":    "PanasonicID-Authentication",
-		}
-
-		jsonData, _ := json.Marshal(loginData)
-		req, _ = http.NewRequest("POST", BasePathAuth+"/usernamepassword/login", bytes.NewReader(jsonData))
-		req.Header.Set("Auth0-Client", Auth0Client)
-		req.Header.Set("User-Agent", "okhttp/4.10.0")
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Cookie", "_csrf="+csrf)
-		fmt.Println("JSON Payload:", string(jsonData))
-
-		resp, err = client.Do(req)
+		resp, err := a.submitLoginForm(csrf, state, client)
 		if err != nil {
 			return err
 		}
@@ -122,7 +98,7 @@ func (a *Authentication) GetNewToken() error {
 		}
 
 		// Step 4: Extract login callback parameters
-		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+		bodyBytes, _ := io.ReadAll(resp.Body)
 		bodyStr := string(bodyBytes)
 		hiddenInputs, err := ExtractHiddenInputValues(bodyStr)
 		if err != nil {
@@ -265,6 +241,37 @@ func (a *Authentication) GetNewToken() error {
 	a.token = &token
 
 	return nil
+}
+
+func (a *Authentication) submitLoginForm(csrf string, state string, client *http.Client) (*http.Response, error) {
+	loginData := map[string]string{
+		"client_id":     AppClientId,
+		"redirect_uri":  RedirectUri,
+		"tenant":        "pdpauthglb-a1",
+		"response_type": "code",
+		"scope":         OAuthScopes,
+		"audience":      OAuthAudience,
+		"_csrf":         csrf,
+		"state":         state,
+		"_intstate":     "deprecated",
+		"username":      a.username,
+		"password":      a.password,
+		"lang":          "en",
+		"connection":    "PanasonicID-Authentication",
+	}
+
+	jsonData, _ := json.Marshal(loginData)
+	req, _ := http.NewRequest("POST", BasePathAuth+"/usernamepassword/login", bytes.NewReader(jsonData))
+	req.Header.Set("Auth0-Client", Auth0Client)
+	req.Header.Set("User-Agent", "okhttp/4.10.0")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Cookie", "_csrf="+csrf)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error submitting login form: %w", err)
+	}
+	return resp, nil
 }
 
 func handleRedirect(resp *http.Response, state string) (string, string, error) {
