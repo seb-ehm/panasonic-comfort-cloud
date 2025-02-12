@@ -87,7 +87,7 @@ func (a *Authentication) GetNewToken() error {
 		}
 
 		// Step 3: Login
-		resp, err := a.submitLoginForm(csrf, state, client)
+		resp, err = a.submitLoginForm(csrf, state, client)
 		if err != nil {
 			return err
 		}
@@ -97,7 +97,7 @@ func (a *Authentication) GetNewToken() error {
 			return fmt.Errorf("login: expected status 200, got %d", resp.StatusCode)
 		}
 
-		err = performLoginCallback(resp, client)
+		resp, err = performLoginCallback(resp, client)
 		if err != nil {
 			return err
 		}
@@ -202,13 +202,13 @@ func (a *Authentication) GetNewToken() error {
 	return nil
 }
 
-func performLoginCallback(resp *http.Response, client *http.Client) error {
+func performLoginCallback(resp *http.Response, client *http.Client) (*http.Response, error) {
 	// Step 4: Extract login callback parameters
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	bodyStr := string(bodyBytes)
 	hiddenInputs, err := ExtractHiddenInputValues(bodyStr)
 	if err != nil {
-		return fmt.Errorf("failed to extract hidden input values: %v", err)
+		return nil, fmt.Errorf("failed to extract hidden input values: %v", err)
 	}
 
 	formData := url.Values{}
@@ -222,19 +222,19 @@ func performLoginCallback(resp *http.Response, client *http.Client) error {
 
 	req, err := http.NewRequest("POST", BasePathAuth+"/login/callback", strings.NewReader(formData.Encode()))
 	if err != nil {
-		return fmt.Errorf("error creating POST request: %w", err)
+		return nil, fmt.Errorf("error creating POST request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", userAgent)
 
 	resp, err = client.Do(req)
 	if err != nil {
-		return fmt.Errorf("error making POST request: %w", err)
+		return nil, fmt.Errorf("error making POST request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusFound { // 302 Found
-		return fmt.Errorf("Unexpected status code: %d\n", resp.StatusCode)
+		return nil, fmt.Errorf("Unexpected status code: %d\n", resp.StatusCode)
 	}
 	// Follow redirect
 	location := resp.Header.Get("Location")
@@ -243,12 +243,12 @@ func performLoginCallback(resp *http.Response, client *http.Client) error {
 	req.Header.Set("User-Agent", "okhttp/4.10.0")
 	resp, err = client.Do(req)
 	if err != nil {
-		return fmt.Errorf("error making POST request: %w", err)
+		return nil, fmt.Errorf("error making POST request: %w", err)
 	}
 	if resp.StatusCode != http.StatusFound {
-		return fmt.Errorf("Unexpected status code: %d\n", resp.StatusCode)
+		return nil, fmt.Errorf("Unexpected status code: %d\n", resp.StatusCode)
 	}
-	return nil
+	return resp, nil
 }
 
 func (a *Authentication) submitLoginForm(csrf string, state string, client *http.Client) (*http.Response, error) {
