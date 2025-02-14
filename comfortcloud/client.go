@@ -3,7 +3,9 @@ package comfortcloud
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
+	"regexp"
 )
 
 type Client struct {
@@ -84,4 +86,26 @@ func (c *Client) GetDeviceState() error {
 func (c *Client) SetDeviceState() error {
 	//TODO implement me
 	panic("implement me")
+}
+
+// getGroupURL returns the URL for retrieving groups.
+func (c *Client) getGroupURL() string {
+	//return "http://localhost:8080"
+	return fmt.Sprintf("%s/device/group", BasePathAcc)
+}
+
+// getDeviceStatusURL returns the URL for retrieving device status.
+func (c *Client) getDeviceStatusURL(guid string) string {
+	escapedGUID := regexp.MustCompile(`(?i)%2f`).ReplaceAllString(url.QueryEscape(guid), "f")
+	return fmt.Sprintf("%s/deviceStatus/%s", BasePathAcc, escapedGUID)
+}
+
+// getDeviceStatusControlURL returns the URL for controlling device status.
+func (c *Client) getDeviceStatusControlURL() string {
+	return fmt.Sprintf("%s/deviceStatus/control", BasePathAcc)
+}
+
+// getDeviceHistoryURL returns the URL for retrieving device history.
+func (c *Client) getDeviceHistoryURL() string {
+	return fmt.Sprintf("%s/deviceHistoryData", BasePathAcc)
 }
