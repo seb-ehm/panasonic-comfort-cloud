@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -29,22 +28,19 @@ func (t *Token) isValid() bool {
 	if t.AccessToken == "" {
 		return false
 	}
-
-	if t.AccessTokenIssuedAt == 0 || t.AccessTokenExpiresAt == 0 {
-		return false
-	}
 	parts := strings.Split(t.AccessToken, ".")
 	if len(parts) != 3 {
 		return false
 	}
-	return true
+
+	expired, err := t.isAccessTokenExpired()
+	if err != nil {
+		return false
+	}
+	return !expired
 }
 
 func (t *Token) isAccessTokenExpired() (bool, error) {
-	if !t.isValid() {
-		return false, errors.New("invalid token")
-	}
-
 	if t.AccessTokenExpiresAt == 0 || t.AccessTokenIssuedAt == 0 {
 		err := t.setIATAndEXP()
 		if err != nil {
@@ -57,7 +53,7 @@ func (t *Token) isAccessTokenExpired() (bool, error) {
 		return true, nil
 	}
 
-	return true, nil
+	return false, nil
 }
 
 func (t *Token) setIATAndEXP() error {
