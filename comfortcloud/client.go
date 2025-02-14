@@ -3,6 +3,7 @@ package comfortcloud
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"regexp"
@@ -66,6 +67,50 @@ func (c *Client) ensureLoggedIn() error {
 
 func (c *Client) Logout() error {
 	return c.auth.Logout()
+}
+
+func (c *Client) GetGroups() error {
+	// Ensure the client is logged in
+	if err := c.ensureLoggedIn(); err != nil {
+		return err
+	}
+
+	// Get the URL for fetching groups
+	groupURL := c.getGroupURL()
+	response, err := c.auth.ExecuteGet(groupURL, "get_groups", http.StatusOK)
+	if err != nil {
+		fmt.Println("Failed to get groups:", err)
+		return err
+	}
+
+	// Parse JSON response
+	var result map[string]interface{}
+	if err := json.Unmarshal(response, &result); err != nil {
+		fmt.Println("Failed to parse groups response:", err)
+		return err
+	}
+	fmt.Println("Groups:", result)
+
+	// Extract and validate "groupList"
+	groupList, ok := result["groupList"].([]interface{})
+	if !ok {
+		return fmt.Errorf("invalid type for groupList")
+	}
+
+	// Convert groupList into a slice of maps
+	var groups []map[string]interface{}
+	for _, g := range groupList {
+		groupMap, ok := g.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("invalid type for group entry")
+		}
+		groups = append(groups, groupMap)
+	}
+
+	// Assign groups to the client
+	c.groups = groups
+	c.devices = nil
+	return nil
 }
 
 func (c *Client) GetDevices() error {
