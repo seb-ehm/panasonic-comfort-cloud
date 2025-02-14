@@ -1,6 +1,8 @@
 package comfortcloud
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,9 +13,8 @@ import (
 
 type Client struct {
 	auth          *Authentication
-	groups        []map[string]interface{}
+	groups        []Group
 	devices       []Device
-	deviceIndexer map[string]string // Maps device ID to device GUID
 	tokenFileName string
 }
 
@@ -22,7 +23,6 @@ func NewClient(username string, password string, tokenFileName string) *Client {
 
 	return &Client{
 		auth:          auth,
-		deviceIndexer: make(map[string]string),
 		tokenFileName: tokenFileName,
 	}
 }
@@ -69,58 +69,79 @@ func (c *Client) Logout() error {
 	return c.auth.Logout()
 }
 
-func (c *Client) GetGroups() error {
+func (c *Client) FetchGroupsAndDevices() error {
 	// Ensure the client is logged in
 	if err := c.ensureLoggedIn(); err != nil {
 		return err
 	}
 
-	// Get the URL for fetching groups
+	// Fetch and parse groups
 	groupURL := c.getGroupURL()
 	response, err := c.auth.ExecuteGet(groupURL, "get_groups", http.StatusOK)
 	if err != nil {
-		fmt.Println("Failed to get groups:", err)
-		return err
+		return fmt.Errorf("failed to fetch groups: %w", err)
 	}
 
-	// Parse JSON response
-	var result map[string]interface{}
+	var result Response
 	if err := json.Unmarshal(response, &result); err != nil {
-		fmt.Println("Failed to parse groups response:", err)
-		return err
-	}
-	fmt.Println("Groups:", result)
-
-	// Extract and validate "groupList"
-	groupList, ok := result["groupList"].([]interface{})
-	if !ok {
-		return fmt.Errorf("invalid type for groupList")
+		return fmt.Errorf("failed to parse groups response: %w", err)
 	}
 
-	// Convert groupList into a slice of maps
-	var groups []map[string]interface{}
-	for _, g := range groupList {
-		groupMap, ok := g.(map[string]interface{})
-		if !ok {
-			return fmt.Errorf("invalid type for group entry")
-		}
-		groups = append(groups, groupMap)
-	}
-
-	// Assign groups to the client
-	c.groups = groups
+	// Reset devices
+	c.groups = result.GroupList
 	c.devices = nil
+
+	// Populate devices
+	for _, group := range c.groups {
+		for _, device := range group.DeviceList {
+			// Append to devices slice
+			c.devices = append(c.devices, device)
+		}
+		fmt.Println(c.devices)
+	}
+
 	return nil
 }
 
-func (c *Client) GetDevices() error {
-	//TODO implement me
-	panic("implement me")
+func (c *Client) GetDevice(deviceID string) (*Device, error) {
+	// Ensure the client is logged in
+	if err := c.ensureLoggedIn(); err != nil {
+		return nil, err
+	}
+
+	// Find the device by DeviceHashGuid or DeviceGuid
+	var device *Device
+	for _, d := range c.devices {
+		if d.DeviceHashGuid == deviceID || hashMD5(d.DeviceGuid) == deviceID {
+			device = &d
+			break
+		}
+	}
+
+	if device == nil {
+		return nil, fmt.Errorf("device not found: %s", deviceID)
+	}
+
+	// Fetch device status using DeviceGuid
+	deviceURL := c.getDeviceStatusURL(device.DeviceGuid)
+	response, err := c.auth.ExecuteGet(deviceURL, "get_device", http.StatusOK)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch device status: %w", err)
+	}
+	fmt.Println("Device Status")
+	fmt.Println(string(response))
+	// Parse response
+
+	if err := json.Unmarshal(response, &device); err != nil {
+		return nil, fmt.Errorf("failed to parse device status: %w", err)
+	}
+
+	return device, nil
 }
 
-func (c *Client) GetDevice() error {
-	//TODO implement me
-	panic("implement me")
+func hashMD5(s string) string {
+	hash := md5.Sum([]byte(s))
+	return hex.EncodeToString(hash[:])
 }
 
 func (c *Client) GetDeviceState() error {
