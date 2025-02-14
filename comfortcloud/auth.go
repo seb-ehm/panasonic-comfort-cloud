@@ -26,12 +26,11 @@ type Authentication struct {
 	appVersion string
 }
 
-func NewAuthentication(username, password string, token *Token, raw bool) *Authentication {
+func NewAuthentication(username, password string, token *Token) *Authentication {
 	return &Authentication{
 		username:   username,
 		password:   password,
 		token:      token,
-		raw:        raw,
 		appVersion: XAppVersion,
 	}
 }
@@ -198,7 +197,6 @@ func getToken(location string, codeVerifier string, client *http.Client) (Token,
 		return Token{}, fmt.Errorf("failed to decode token response: %w", err)
 	}
 	fmt.Println("Token Response:", tokenResponse)
-	tokenResponse.setIATAndEXP()
 
 	// Step 6: Get ACC Client ID
 	if !tokenResponse.isValid() {
@@ -207,7 +205,11 @@ func getToken(location string, codeVerifier string, client *http.Client) (Token,
 	return tokenResponse, nil
 }
 
-func (a *Authentication) refreshToken() error {
+func (a *Authentication) RefreshToken() error {
+	//def _refresh_token(self):
+	//# do before, so that timestamp is older rather than newer
+	//now = datetime.datetime.now()
+	//unix_time_token_received = time.mktime(now.timetuple())
 
 	// Prepare the request payload
 	payload := map[string]interface{}{
@@ -218,21 +220,37 @@ func (a *Authentication) refreshToken() error {
 	}
 
 	// Prepare the request URL
-	token_url := fmt.Sprintf("%s/oauth/token", BasePathAuth)
-
-	// Send the POST request using ExecutePost
-	response, err := a.ExecutePost(token_url, payload, "refresh_token", http.StatusOK)
+	tokenUrl := fmt.Sprintf("%s/oauth/token", BasePathAuth)
+	jsonBytes, err := json.Marshal(payload)
 	if err != nil {
-		// If the refresh token request fails, get a new token
-		if err := a.GetNewToken(); err != nil {
-			return fmt.Errorf("failed to get new token: %v", err)
+		return fmt.Errorf("failed to marshal JSON data: %w", err)
+	}
+
+	// Create the HTTP POST request
+	req, err := http.NewRequest(http.MethodPost, tokenUrl, bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		return fmt.Errorf("failed to create POST request: %v", err)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
+	if err != nil || resp.StatusCode != http.StatusOK {
+		err := a.GetNewToken()
+		if err != nil {
+			return fmt.Errorf("failed to get new token: %w", err)
 		}
 		return nil
 	}
 
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
 	// Parse the response
 	var tokenResponse map[string]interface{}
-	if err := json.Unmarshal(response, &tokenResponse); err != nil {
+	if err := json.Unmarshal(body, &tokenResponse); err != nil {
 		return fmt.Errorf("failed to parse token response: %v", err)
 	}
 	iat, exp, err := extractIATAndEXPFromJWT(a.token.AccessToken)
@@ -416,9 +434,8 @@ func ExtractHiddenInputValues(htmlBody string) (map[string]string, error) {
 }
 
 func (a *Authentication) ExecuteGet(url, functionDescription string, expectedStatusCode int) ([]byte, error) {
-	// Ensure the token is valid
-	expired, err := a.token.isAccessTokenExpired()
-	if expired || err != nil {
+
+	if !a.token.isValid() {
 		err := a.GetNewToken()
 		if err != nil {
 			return nil, fmt.Errorf("invalid or expired token. error getting new token: %w", err)
@@ -466,8 +483,7 @@ func (a *Authentication) ExecuteGet(url, functionDescription string, expectedSta
 
 func (a *Authentication) ExecutePost(url string, jsonData map[string]interface{}, functionDescription string, expectedStatusCode int) ([]byte, error) {
 	// Ensure the token is valid
-	expired, err := a.token.isAccessTokenExpired()
-	if expired || err != nil {
+	if !a.token.isValid() {
 		err := a.GetNewToken()
 		if err != nil {
 			return nil, fmt.Errorf("invalid or expired token. error getting new token: %w", err)
@@ -539,4 +555,52 @@ func (a *Authentication) getHeaderForAPICalls() map[string]string {
 	}
 
 	return headers
+}
+
+func (a *Authentication) Login() error {
+	if !a.token.isValid() {
+		expired, err := a.token.isAccessTokenExpired()
+		if err != nil {
+			err := a.GetNewToken()
+			if err != nil {
+				return fmt.Errorf("invalid or expired token. error getting new token: %w", err)
+			}
+		}
+		if expired {
+			err := a.RefreshToken()
+			if err != nil {
+				err := a.GetNewToken()
+				if err != nil {
+					return fmt.Errorf("invalid or expired token. error getting new token: %w", err)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// Logout logs out of the API.
+func (a *Authentication) Logout() error {
+	// Prepare the URL for the logout request
+	logoutUrl := fmt.Sprintf("%s/auth/v2/logout", BasePathAcc)
+
+	// Send the POST request
+	response, err := a.ExecutePost(logoutUrl, nil, "logout", http.StatusOK)
+	if err != nil {
+		return fmt.Errorf("logout request failed: %v", err)
+	}
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.Unmarshal(response, &result); err != nil {
+		return fmt.Errorf("failed to parse logout response: %v", err)
+	}
+
+	// Check if the logout was successful
+	if result["result"].(float64) != 0 {
+		// Logout failed, but we don't raise an error (as per the Python implementation)
+		fmt.Println("Logout issue detected, but ignoring it")
+	}
+
+	return nil
 }
