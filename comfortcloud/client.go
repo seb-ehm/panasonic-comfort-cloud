@@ -144,14 +144,29 @@ func hashMD5(s string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func (c *Client) GetDeviceState() error {
-	//TODO implement me
-	panic("implement me")
-}
+func (c *Client) SetDevice(deviceID string, options ...DeviceOption) error {
+	parameter := &ParameterOptions{}
+	for _, option := range options {
+		option(parameter)
+	}
+	newParameters, err := json.Marshal(parameter)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(newParameters))
 
-func (c *Client) SetDeviceState() error {
-	//TODO implement me
-	panic("implement me")
+	var result map[string]interface{}
+	if err := json.Unmarshal(newParameters, &result); err != nil {
+		return fmt.Errorf("failed to unmarshal JSON to map: %w", err)
+	}
+
+	// Send the POST request to update the device
+	_, err = c.auth.ExecutePost(c.getDeviceStatusControlURL(), result, "set_device", http.StatusOK)
+	if err != nil {
+		return fmt.Errorf("failed to set device parameters: %w", err)
+	}
+
+	return nil
 }
 
 // getGroupURL returns the URL for retrieving groups.
