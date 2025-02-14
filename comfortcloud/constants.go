@@ -14,3 +14,99 @@ const (
 )
 
 var OAuthAudience = fmt.Sprintf(OAuthAudienceURL, AppClientId)
+
+type Power int
+
+const (
+	PowerOff Power = iota
+	PowerOn
+)
+
+type OperationMode int
+
+const (
+	OperationModeAuto OperationMode = iota
+	OperationModeDry
+	OperationModeCool
+	OperationModeHeat
+	OperationModeFan
+)
+
+type AirSwingUD int
+
+const (
+	AirSwingUDAuto AirSwingUD = iota - 1
+	AirSwingUDUp
+	_
+	AirSwingUDUpMid
+	AirSwingUDMid
+	AirSwingUDDownMid
+	AirSwingUDDown
+	AirSwingUDSwing
+)
+
+type AirSwingLR int
+
+const (
+	AirSwingLRAuto AirSwingLR = iota - 1
+	AirSwingLRLeft
+	AirSwingLRMid
+	_
+	AirSwingLRRightMid
+	AirSwingLRRight
+)
+
+type EcoMode int
+
+const (
+	EcoModeAuto EcoMode = iota
+	EcoModePowerful
+	EcoModeQuiet
+)
+
+type AirSwingAutoMode int
+
+const (
+	AirSwingAutoModeDisabled AirSwingAutoMode = iota
+	AirSwingAutoModeBoth
+	AirSwingAutoModeAirSwingUD
+	AirSwingAutoModeAirSwingLR
+)
+
+type FanSpeed int
+
+const (
+	FanSpeedAuto FanSpeed = iota
+	FanSpeedLow
+	FanSpeedLowMid
+	FanSpeedMid
+	FanSpeedHighMid
+	FanSpeedHigh
+)
+
+type DataMode int
+
+const (
+	DataModeDay DataMode = iota
+	DataModeWeek
+	DataModeMonth
+	_
+	DataModeYear
+)
+
+var DataModeMap = map[string]DataMode{
+	"Day":   DataModeDay,
+	"Week":  DataModeWeek,
+	"Month": DataModeMonth,
+	"Year":  DataModeYear,
+}
+
+type NanoeMode int
+
+const (
+	NanoeModeUnavailable NanoeMode = iota
+	NanoeModeOff
+	NanoeModeOn
+	NanoeModeModeG
+	NanoeModeAll
+)
