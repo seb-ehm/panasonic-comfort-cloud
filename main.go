@@ -23,11 +23,15 @@ func main() {
 	if password == "" {
 		log.Fatal("PANASONIC_PASSWORD is not set in the .env file")
 	}
-	auth := comfortcloud.NewAuthentication(username, password, nil, false)
+	auth := comfortcloud.NewAuthentication(username, password, nil)
 	err = auth.GetNewToken()
 	if err != nil {
 		fmt.Println(err)
 	}
-	
-	fmt.Println("Hello World")
+	fmt.Println("Refreshing token")
+	err = auth.RefreshToken()
+	if err != nil {
+		fmt.Println(err)
+	}
+
 }
