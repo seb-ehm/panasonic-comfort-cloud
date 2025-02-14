@@ -41,6 +41,9 @@ func (t *Token) isValid() bool {
 }
 
 func (t *Token) isAccessTokenExpired() (bool, error) {
+	if t == nil {
+		return false, fmt.Errorf("Token is nil")
+	}
 	if t.AccessTokenExpiresAt == 0 || t.AccessTokenIssuedAt == 0 {
 		err := t.setIATAndEXP()
 		if err != nil {
