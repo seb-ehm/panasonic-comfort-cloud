@@ -56,6 +56,28 @@ type Parameters struct {
 	AirQuality        int              `json:"airQuality"`
 }
 
+type ParameterOptions struct {
+	Operate           *Power            `json:"operate"`
+	OperationMode     *OperationMode    `json:"operationMode"`
+	TemperatureSet    *int              `json:"temperatureSet"`
+	FanSpeed          *FanSpeed         `json:"fanSpeed"`
+	FanAutoMode       *AirSwingAutoMode `json:"fanAutoMode"`
+	AirSwingLR        *AirSwingLR       `json:"airSwingLR"`
+	AirSwingUD        *AirSwingUD       `json:"airSwingUD"`
+	EcoFunctionData   *int              `json:"ecoFunctionData"`
+	EcoMode           *EcoMode          `json:"ecoMode"`
+	EcoNavi           *int              `json:"ecoNavi"`
+	Nanoe             *NanoeMode        `json:"nanoe"`
+	IAuto             *int              `json:"iAuto"`
+	AirDirection      *int              `json:"airDirection"`
+	LastSettingMode   *int              `json:"lastSettingMode"`
+	InsideCleaning    *int              `json:"insideCleaning"`
+	Fireplace         *int              `json:"fireplace"`
+	InsideTemperature *int              `json:"insideTemperature"`
+	OutTemperature    *int              `json:"outTemperature"`
+	AirQuality        *int              `json:"airQuality"`
+}
+
 /*full response for the GetDevice API:
 type FullGetDeviceAnswer struct {
 	Timestamp       int64 `json:"timestamp"`
