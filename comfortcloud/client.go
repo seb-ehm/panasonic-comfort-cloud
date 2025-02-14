@@ -30,27 +30,20 @@ func (c *Client) Login() error {
 	if c.auth.token.isValid() {
 		return nil
 	}
-
-	tokenFile, err := os.ReadFile(c.tokenFileName)
-	if err != nil {
-		return fmt.Errorf("failed to read token file: %v", err)
-	}
-
 	var token Token
-	if err := json.Unmarshal(tokenFile, &token); err != nil {
-		return fmt.Errorf("failed to parse token file: %w", err)
+	tokenFile, err := os.ReadFile(c.tokenFileName)
+	if err == nil {
+		if err := json.Unmarshal(tokenFile, &token); err == nil {
+			if token.isValid() {
+				c.auth.token = &token
+				return nil
+			}
+		}
 	}
-	if !token.isValid() {
-		return fmt.Errorf("invalid token file")
+	err2 := c.auth.Login()
+	if err2 != nil {
+		return fmt.Errorf("token file invalid: %w, failed to login to Comfort Cloud. %w", err, err2)
 	}
-
-	c.auth.token = &token
-
-	err = c.auth.Login()
-	if err != nil {
-		return err
-	}
-
 	updatedToken := c.auth.token
 	tokenJSON, err := json.MarshalIndent(updatedToken, "", "  ")
 	if err != nil {
@@ -60,7 +53,14 @@ func (c *Client) Login() error {
 	if err := os.WriteFile(c.tokenFileName, tokenJSON, 0644); err != nil {
 		return fmt.Errorf("failed to write token file: %w", err)
 	}
+	return nil
+}
 
+func (c *Client) ensureLoggedIn() error {
+	err := c.auth.Login()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
