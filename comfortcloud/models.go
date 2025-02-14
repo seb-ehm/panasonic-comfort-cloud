@@ -35,18 +35,77 @@ type ModeAvl struct {
 }
 
 type Parameters struct {
-	Operate         Power            `json:"operate"`
-	OperationMode   OperationMode    `json:"operationMode"`
-	TemperatureSet  int              `json:"temperatureSet"`
-	FanSpeed        FanSpeed         `json:"fanSpeed"`
-	FanAutoMode     AirSwingAutoMode `json:"fanAutoMode"`
-	AirSwingLR      AirSwingLR       `json:"airSwingLR"`
-	AirSwingUD      AirSwingUD       `json:"airSwingUD"`
-	EcoFunctionData int              `json:"ecoFunctionData"`
-	EcoMode         EcoMode          `json:"ecoMode"`
-	EcoNavi         int              `json:"ecoNavi"`
-	Nanoe           NanoeMode        `json:"nanoe"`
-	IAuto           int              `json:"iAuto"`
-	AirDirection    int              `json:"airDirection"`
-	LastSettingMode int              `json:"lastSettingMode"`
+	Operate           Power            `json:"operate"`
+	OperationMode     OperationMode    `json:"operationMode"`
+	TemperatureSet    int              `json:"temperatureSet"`
+	FanSpeed          FanSpeed         `json:"fanSpeed"`
+	FanAutoMode       AirSwingAutoMode `json:"fanAutoMode"`
+	AirSwingLR        AirSwingLR       `json:"airSwingLR"`
+	AirSwingUD        AirSwingUD       `json:"airSwingUD"`
+	EcoFunctionData   int              `json:"ecoFunctionData"`
+	EcoMode           EcoMode          `json:"ecoMode"`
+	EcoNavi           int              `json:"ecoNavi"`
+	Nanoe             NanoeMode        `json:"nanoe"`
+	IAuto             int              `json:"iAuto"`
+	AirDirection      int              `json:"airDirection"`
+	LastSettingMode   int              `json:"lastSettingMode"`
+	InsideCleaning    int              `json:"insideCleaning"`
+	Fireplace         int              `json:"fireplace"`
+	InsideTemperature int              `json:"insideTemperature"`
+	OutTemperature    int              `json:"outTemperature"`
+	AirQuality        int              `json:"airQuality"`
 }
+
+/*full response for the GetDevice API:
+type FullGetDeviceAnswer struct {
+	Timestamp       int64 `json:"timestamp"`
+	Permission      int   `json:"permission"`
+	SummerHouse     int   `json:"summerHouse"`
+	IAutoX          bool  `json:"iAutoX"`
+	Nanoe           bool  `json:"nanoe"`
+	NanoeStandAlone bool  `json:"nanoeStandAlone"`
+	AutoMode        bool  `json:"autoMode"`
+	HeatMode        bool  `json:"heatMode"`
+	FanMode         bool  `json:"fanMode"`
+	DryMode         bool  `json:"dryMode"`
+	CoolMode        bool  `json:"coolMode"`
+	EcoNavi         bool  `json:"ecoNavi"`
+	PowerfulMode    bool  `json:"powerfulMode"`
+	QuietMode       bool  `json:"quietMode"`
+	AirSwingLR      bool  `json:"airSwingLR"`
+	AutoSwingUD     bool  `json:"autoSwingUD"`
+	EcoFunction     int   `json:"ecoFunction"`
+	TemperatureUnit int   `json:"temperatureUnit"`
+	ModeAvlList     struct {
+		AutoMode int `json:"autoMode"`
+	} `json:"modeAvlList"`
+	NanoeList struct {
+		VisualizationShow int `json:"visualizationShow"`
+	} `json:"nanoeList"`
+	ClothesDrying  bool `json:"clothesDrying"`
+	InsideCleaning bool `json:"insideCleaning"`
+	Fireplace      bool `json:"fireplace"`
+	PairedFlg      bool `json:"pairedFlg"`
+	Parameters     struct {
+		EcoFunctionData   int `json:"ecoFunctionData"`
+		InsideCleaning    int `json:"insideCleaning"`
+		Fireplace         int `json:"fireplace"`
+		LastSettingMode   int `json:"lastSettingMode"`
+		Operate           int `json:"operate"`
+		OperationMode     int `json:"operationMode"`
+		TemperatureSet    int `json:"temperatureSet"`
+		FanSpeed          int `json:"fanSpeed"`
+		FanAutoMode       int `json:"fanAutoMode"`
+		AirSwingLR        int `json:"airSwingLR"`
+		AirSwingUD        int `json:"airSwingUD"`
+		EcoMode           int `json:"ecoMode"`
+		EcoNavi           int `json:"ecoNavi"`
+		Nanoe             int `json:"nanoe"`
+		IAuto             int `json:"iAuto"`
+		AirDirection      int `json:"airDirection"`
+		InsideTemperature int `json:"insideTemperature"`
+		OutTemperature    int `json:"outTemperature"`
+		AirQuality        int `json:"airQuality"`
+	} `json:"parameters"`
+	DeviceNanoe int `json:"deviceNanoe"`
+}*/
