@@ -37,7 +37,7 @@ type ModeAvl struct {
 type Parameters struct {
 	Operate           Power            `json:"operate"`
 	OperationMode     OperationMode    `json:"operationMode"`
-	TemperatureSet    int              `json:"temperatureSet"`
+	TemperatureSet    float64          `json:"temperatureSet"`
 	FanSpeed          FanSpeed         `json:"fanSpeed"`
 	FanAutoMode       AirSwingAutoMode `json:"fanAutoMode"`
 	AirSwingLR        AirSwingLR       `json:"airSwingLR"`
