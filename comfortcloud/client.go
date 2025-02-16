@@ -103,6 +103,14 @@ func (c *Client) FetchGroupsAndDevices() error {
 	return nil
 }
 
+func (c *Client) GetDevices() ([]Device, error) {
+	err := c.FetchGroupsAndDevices()
+	if err != nil {
+		return nil, err
+	}
+	return c.devices, nil
+}
+
 func (c *Client) GetDevice(deviceID string) (*Device, error) {
 	// Ensure the client is logged in
 	if err := c.ensureLoggedIn(); err != nil {
@@ -149,19 +157,22 @@ func (c *Client) SetDevice(deviceID string, options ...DeviceOption) error {
 	for _, option := range options {
 		option(parameter)
 	}
-	newParameters, err := json.Marshal(parameter)
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(newParameters))
 
-	var result map[string]interface{}
-	if err := json.Unmarshal(newParameters, &result); err != nil {
-		return fmt.Errorf("failed to unmarshal JSON to map: %w", err)
+	var device *Device
+	for _, d := range c.devices {
+		if d.DeviceHashGuid == deviceID || hashMD5(d.DeviceGuid) == deviceID {
+			device = &d
+			break
+		}
+	}
+
+	payload := map[string]interface{}{
+		"deviceGuid": device.DeviceGuid,
+		"parameters": parameter,
 	}
 
 	// Send the POST request to update the device
-	_, err = c.auth.ExecutePost(c.getDeviceStatusControlURL(), result, "set_device", http.StatusOK)
+	_, err := c.auth.ExecutePost(c.getDeviceStatusControlURL(), payload, "set_device", http.StatusOK)
 	if err != nil {
 		return fmt.Errorf("failed to set device parameters: %w", err)
 	}
