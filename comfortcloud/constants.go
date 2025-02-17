@@ -22,6 +22,17 @@ const (
 	PowerOn
 )
 
+func (p Power) String() string {
+	switch p {
+	case PowerOff:
+		return "Off"
+	case PowerOn:
+		return "On"
+	default:
+		return "Unknown"
+	}
+}
+
 type OperationMode int
 
 const (
