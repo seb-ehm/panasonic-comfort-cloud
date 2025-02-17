@@ -51,15 +51,15 @@ type Parameters struct {
 	LastSettingMode   int              `json:"lastSettingMode"`
 	InsideCleaning    int              `json:"insideCleaning"`
 	Fireplace         int              `json:"fireplace"`
-	InsideTemperature int              `json:"insideTemperature"`
-	OutTemperature    int              `json:"outTemperature"`
+	InsideTemperature float64          `json:"insideTemperature"`
+	OutTemperature    float64          `json:"outTemperature"`
 	AirQuality        int              `json:"airQuality"`
 }
 
 type ParameterOptions struct {
 	Operate           *Power            `json:"operate,omitempty"`
 	OperationMode     *OperationMode    `json:"operationMode,omitempty"`
-	TemperatureSet    *int              `json:"temperatureSet,omitempty"`
+	TemperatureSet    *float64          `json:"temperatureSet,omitempty"`
 	FanSpeed          *FanSpeed         `json:"fanSpeed,omitempty"`
 	FanAutoMode       *AirSwingAutoMode `json:"fanAutoMode,omitempty"`
 	AirSwingLR        *AirSwingLR       `json:"airSwingLR,omitempty"`
@@ -73,8 +73,8 @@ type ParameterOptions struct {
 	LastSettingMode   *int              `json:"lastSettingMode,omitempty"`
 	InsideCleaning    *int              `json:"insideCleaning,omitempty"`
 	Fireplace         *int              `json:"fireplace,omitempty"`
-	InsideTemperature *int              `json:"insideTemperature,omitempty"`
-	OutTemperature    *int              `json:"outTemperature,omitempty"`
+	InsideTemperature *float64          `json:"insideTemperature,omitempty"`
+	OutTemperature    *float64          `json:"outTemperature,omitempty"`
 	AirQuality        *int              `json:"airQuality,omitempty"`
 }
 

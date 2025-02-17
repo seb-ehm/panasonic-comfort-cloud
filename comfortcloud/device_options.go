@@ -2,7 +2,7 @@ package comfortcloud
 
 type DeviceOption func(*ParameterOptions)
 
-func WithTemperature(temperature int) DeviceOption {
+func WithTemperature(temperature float64) DeviceOption {
 	return func(o *ParameterOptions) {
 		o.TemperatureSet = &temperature
 	}

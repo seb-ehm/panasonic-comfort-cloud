@@ -51,7 +51,7 @@ func main() {
 
 	err = c.SetDevice(deviceID,
 		comfortcloud.WithPower(comfortcloud.PowerOn),
-		comfortcloud.WithTemperature(22))
+		comfortcloud.WithTemperature(22.0))
 	if err != nil {
 		fmt.Println(err)
 	}
