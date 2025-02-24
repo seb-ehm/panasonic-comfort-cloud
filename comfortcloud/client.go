@@ -160,7 +160,7 @@ func (c *Client) SetDevice(deviceID string, options ...DeviceOption) error {
 
 	var device *Device
 	for _, d := range c.devices {
-		if d.DeviceHashGuid == deviceID || hashMD5(d.DeviceGuid) == deviceID {
+		if d.DeviceHashGuid == deviceID || d.DeviceGuid == deviceID {
 			device = &d
 			break
 		}
