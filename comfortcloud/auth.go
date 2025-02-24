@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"io"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"net/http/cookiejar"
@@ -36,6 +37,7 @@ func NewAuthentication(username, password string, token *Token) *Authentication 
 }
 
 func (a *Authentication) GetNewToken() error {
+	slog.Info("Starting token retrieval")
 	jar, _ := cookiejar.New(nil)
 	client := &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -45,16 +47,19 @@ func (a *Authentication) GetNewToken() error {
 	}
 
 	state, codeVerifier, codeChallenge := generateOAuthParameters()
+	slog.Debug("OAuth parameters generated", "state", state, "codeChallenge", codeChallenge)
 
 	// Step 1: Authorize
 
 	resp, err := makeAuthorizeRequest(codeChallenge, state, client)
 	if err != nil {
+		slog.Error("Authorization request failed", "error", err)
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusFound {
+		slog.Error("Unexpected authorize response", "expected", 302, "got", resp.StatusCode)
 		return fmt.Errorf("authorize: expected status 302, got %d", resp.StatusCode)
 	}
 
