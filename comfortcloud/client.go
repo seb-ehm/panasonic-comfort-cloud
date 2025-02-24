@@ -120,7 +120,7 @@ func (c *Client) GetDevice(deviceID string) (*Device, error) {
 	// Find the device by DeviceHashGuid or DeviceGuid
 	var device *Device
 	for _, d := range c.devices {
-		if d.DeviceHashGuid == deviceID || hashMD5(d.DeviceGuid) == deviceID {
+		if d.DeviceHashGuid == deviceID || d.DeviceGuid == deviceID {
 			device = &d
 			break
 		}
